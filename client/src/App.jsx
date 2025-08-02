@@ -1,28 +1,48 @@
-// App.jsx
-import { Routes, Route } from "react-router-dom";
-import Navbar from "./components/Navbar";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "./firebase";
+
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import Groups from "./pages/Groups";
-import Search from "./pages/Search";
-import NotFound from "./pages/NotFound";
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Persist login state using Firebase
+  useEffect(() => {
+    onAuthStateChanged(auth, (user) => {
+      setIsAuthenticated(!!user);
+    });
+  }, []);
+
   return (
-    <>
-      <Navbar />
+    <div className="font-sans bg-gray-100 min-h-screen">
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/login" element={<Login />} />
+        <Route
+          path="/login"
+          element={<Login setIsAuthenticated={setIsAuthenticated} />}
+        />
         <Route path="/register" element={<Register />} />
-        <Route path="/profile/:id" element={<Profile />} />
-        <Route path="/groups" element={<Groups />} />
-        <Route path="/search" element={<Search />} />
-        <Route path="*" element={<NotFound />} />
+        <Route
+          path="/dashboard"
+          element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/profile"
+          element={isAuthenticated ? <Profile /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/groups"
+          element={isAuthenticated ? <Groups /> : <Navigate to="/login" />}
+        />
       </Routes>
-    </>
+    </div>
   );
 }
 

@@ -1,28 +1,33 @@
-// src/components/Navbar.jsx
-
-import { Link } from "react-router-dom";
+import { signOut } from "firebase/auth";
+import { auth } from "../firebase";
+import { useNavigate, Link } from "react-router-dom";
 
 const Navbar = () => {
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    navigate("/login");
+  };
+
   return (
-    <nav className="bg-white shadow-md">
-      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-        <Link to="/" className="text-xl font-bold text-blue-700">
-          CampusConnect
+    <nav className="bg-blue-600 text-white px-6 py-4 flex justify-between items-center shadow">
+      <h1 className="text-xl font-bold">
+        <Link to="/dashboard">CampusConnect</Link>
+      </h1>
+      <div className="flex gap-4">
+        <Link to="/groups" className="hover:underline">
+          Groups
         </Link>
-        <div className="space-x-4">
-          <Link to="/groups" className="text-gray-700 hover:text-blue-600">
-            Groups
-          </Link>
-          <Link to="/search" className="text-gray-700 hover:text-blue-600">
-            Search
-          </Link>
-          <Link to="/login" className="text-gray-700 hover:text-blue-600">
-            Login
-          </Link>
-          <Link to="/register" className="text-white bg-blue-600 px-3 py-1 rounded hover:bg-blue-700">
-            Sign Up
-          </Link>
-        </div>
+        <Link to="/profile" className="hover:underline">
+          Profile
+        </Link>
+        <button
+          onClick={handleLogout}
+          className="bg-white text-blue-600 px-4 py-1 rounded hover:bg-gray-100"
+        >
+          Logout
+        </button>
       </div>
     </nav>
   );
