@@ -1,51 +1,62 @@
 import { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
-import { auth, db } from "../firebase";
-import {
-  collection,
-  addDoc,
-  onSnapshot,
-  updateDoc,
-  doc,
-  arrayUnion,
-} from "firebase/firestore";
+import { supabase } from "../supabase";
 
 const Groups = () => {
   const [groupName, setGroupName] = useState("");
   const [groups, setGroups] = useState([]);
+  const [user, setUser] = useState(null);
 
-  // Fetch groups in real-time
+  // Get current user
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, "groups"), (snapshot) => {
-      const groupList = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setGroups(groupList);
-    });
-    return () => unsubscribe();
+    const fetchUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user);
+    };
+    fetchUser();
+  }, []);
+
+  // Fetch all groups
+  useEffect(() => {
+    const fetchGroups = async () => {
+      const { data, error } = await supabase.from("groups").select("*");
+      if (data) setGroups(data);
+    };
+    fetchGroups();
   }, []);
 
   // Create a new group
   const handleCreateGroup = async (e) => {
     e.preventDefault();
-    if (groupName.trim() === "") return;
+    if (!groupName.trim() || !user) return;
 
-    await addDoc(collection(db, "groups"), {
-      name: groupName,
-      createdBy: auth.currentUser.uid,
-      members: [auth.currentUser.uid],
-    });
+    await supabase.from("groups").insert([
+      {
+        name: groupName,
+        created_by: user.id,
+        members: [user.id],
+      },
+    ]);
 
     setGroupName("");
+
+    // Refresh groups
+    const { data } = await supabase.from("groups").select("*");
+    setGroups(data);
   };
 
   // Join a group
-  const handleJoinGroup = async (groupId) => {
-    const groupRef = doc(db, "groups", groupId);
-    await updateDoc(groupRef, {
-      members: arrayUnion(auth.currentUser.uid),
-    });
+  const handleJoinGroup = async (groupId, currentMembers) => {
+    const updatedMembers = [...new Set([...currentMembers, user.id])]; // avoid duplicates
+
+    await supabase
+      .from("groups")
+      .update({ members: updatedMembers })
+      .eq("id", groupId);
+
+    // Refresh groups
+    const { data } = await supabase.from("groups").select("*");
+    setGroups(data);
   };
 
   return (
@@ -71,7 +82,7 @@ const Groups = () => {
           </button>
         </form>
 
-        {/* Groups list */}
+        {/* Group list */}
         <div className="space-y-3">
           {groups.length > 0 ? (
             groups.map((group) => (
@@ -80,13 +91,13 @@ const Groups = () => {
                 className="flex justify-between items-center bg-gray-100 p-3 rounded"
               >
                 <span className="font-semibold">{group.name}</span>
-                {group.members.includes(auth.currentUser.uid) ? (
+                {group.members?.includes(user?.id) ? (
                   <span className="text-green-600 text-sm font-semibold">
                     Joined
                   </span>
                 ) : (
                   <button
-                    onClick={() => handleJoinGroup(group.id)}
+                    onClick={() => handleJoinGroup(group.id, group.members || [])}
                     className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm"
                   >
                     Join

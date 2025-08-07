@@ -1,20 +1,122 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
+import { supabase } from "../supabase";
 import { FaPaperPlane, FaCommentDots } from "react-icons/fa";
 
 const Home = () => {
+  const [search, setSearch] = useState("");
+  const [posts, setPosts] = useState([]);
+  const [newPost, setNewPost] = useState("");
+  const [groups, setGroups] = useState([]);
+  const [selectedGroup, setSelectedGroup] = useState("");
+  const [user, setUser] = useState(null);
+  const [allUsers, setAllUsers] = useState([]);
+  const [filteredUsers, setFilteredUsers] = useState([]);
+
   const [messageOpen, setMessageOpen] = useState(false);
   const [messageText, setMessageText] = useState("");
 
-  // Dummy connected friends
-  const friends = [
-    { name: "Alice Johnson", post: "Excited for the campus fest!" },
-    { name: "Brian Lee", post: "Just submitted my final project. 🧠" },
-    { name: "Carla Smith", post: "Looking for study buddies 📚" },
-  ];
+  // Get current user
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data?.user) setUser(data.user);
+    };
+    fetchUser();
+  }, []);
+
+  // Fetch groups
+  useEffect(() => {
+    const fetchGroups = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from("groups")
+        .select("*")
+        .contains("members", [user.id]);
+
+      if (data) {
+        setGroups(data);
+        if (!selectedGroup && data.length > 0) {
+          setSelectedGroup(data[0].id);
+        }
+      }
+    };
+    fetchGroups();
+  }, [user]);
+
+  // Fetch posts
+  useEffect(() => {
+    const fetchPosts = async () => {
+      if (!selectedGroup) return;
+      const { data } = await supabase
+        .from("posts")
+        .select("*")
+        .eq("group_id", selectedGroup)
+        .order("created_at", { ascending: false });
+
+      if (data) setPosts(data);
+    };
+    fetchPosts();
+  }, [selectedGroup]);
+
+  // Fetch all users
+  useEffect(() => {
+    const fetchUsers = async () => {
+      const { data } = await supabase.from("users").select("id, username, email");
+      if (data) {
+        setAllUsers(data);
+        setFilteredUsers(data);
+      }
+    };
+    fetchUsers();
+  }, []);
+
+  // Filter posts
+  const filteredPosts = posts.filter(
+    (post) =>
+      post.content.toLowerCase().includes(search.toLowerCase()) ||
+      (post.author?.toLowerCase() || "").includes(search.toLowerCase())
+  );
+
+  // Filter users (user search bar)
+  const handleUserSearch = (e) => {
+    const query = e.target.value.toLowerCase();
+    const results = allUsers.filter((u) =>
+      u.username?.toLowerCase().includes(query) || u.email?.toLowerCase().includes(query)
+    );
+    setFilteredUsers(results);
+  };
+
+  const handleCreatePost = async (e) => {
+    e.preventDefault();
+    if (!newPost.trim() || !user || !selectedGroup) return;
+
+    const { error } = await supabase.from("posts").insert([
+      {
+        content: newPost,
+        author: user.email,
+        author_id: user.id,
+        group_id: selectedGroup,
+      },
+    ]);
+
+    if (!error) {
+      setNewPost("");
+      const { data } = await supabase
+        .from("posts")
+        .select("*")
+        .eq("group_id", selectedGroup)
+        .order("created_at", { ascending: false });
+      setPosts(data);
+    }
+  };
 
   const handleSendMessage = () => {
-    alert("Message sent to all connected friends: " + messageText);
+    if (!messageText.trim()) {
+      alert("Please type a message before sending.");
+      return;
+    }
+    alert("✅ Message sent to all connected friends:\n\n" + messageText);
     setMessageText("");
     setMessageOpen(false);
   };
@@ -23,57 +125,49 @@ const Home = () => {
     <div className="min-h-screen bg-gray-100">
       <Navbar />
 
-      <div className="max-w-6xl mx-auto mt-10 px-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Feed Section */}
-        <div className="lg:col-span-2">
-          <h2 className="text-3xl font-bold mb-4 text-blue-700">Your Feed</h2>
 
-          {/* Post input box (UI only) */}
-          <div className="bg-white p-4 rounded shadow mb-6">
-            <input
-              type="text"
-              placeholder="What's on your mind?"
-              className="w-full border rounded px-4 py-2 mb-2 focus:outline-none"
-            />
-            <button className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 float-right">
-              Post
-            </button>
-            <div className="clear-both"></div>
-          </div>
 
-          {/* Friend posts */}
-          <div className="space-y-4">
-            {friends.map((friend, i) => (
-              <div key={i} className="bg-white p-4 rounded shadow flex items-start gap-4">
-                <div className="w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center font-semibold text-lg">
-                  {friend.name.split(" ").map(n => n[0]).join("")}
-                </div>
-                <div>
-                  <p className="font-semibold text-blue-800">{friend.name}</p>
-                  <p className="text-gray-700 mt-1">{friend.post}</p>
-                </div>
+      {/* 🔹 Main Content */}
+      <div className="max-w-3xl mx-auto p-6">
+        <form onSubmit={handleCreatePost} className="mb-6 flex gap-2">
+          <input
+            type="text"
+            placeholder="What's on your mind?"
+            className="flex-1 p-3 border rounded"
+            value={newPost}
+            onChange={(e) => setNewPost(e.target.value)}
+          />
+          <button
+            type="submit"
+            className="bg-blue-600 text-white px-4 rounded hover:bg-blue-700"
+          >
+            Post
+          </button>
+        </form>
+
+        <input
+          type="text"
+          placeholder="Search posts..."
+          className="w-full p-3 mb-6 border rounded"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+
+        <div className="space-y-4">
+          {filteredPosts.length > 0 ? (
+            filteredPosts.map((post) => (
+              <div key={post.id} className="bg-white p-4 rounded shadow">
+                <p className="text-gray-800">{post.content}</p>
+                <p className="text-sm text-gray-500 mt-1">— {post.author}</p>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Friends List */}
-        <div className="bg-white rounded shadow p-4">
-          <h3 className="text-lg font-bold text-blue-700 mb-2">Connected Friends</h3>
-          <ul className="space-y-2">
-            {friends.map((f, i) => (
-              <li key={i} className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-blue-400 text-white rounded-full flex items-center justify-center text-sm">
-                  {f.name.split(" ").map(n => n[0]).join("")}
-                </div>
-                <span className="text-gray-800">{f.name}</span>
-              </li>
-            ))}
-          </ul>
+            ))
+          ) : (
+            <p className="text-gray-500 text-center">No posts yet for this group.</p>
+          )}
         </div>
       </div>
 
-      {/* Floating Action Button (FAB) */}
+      {/* 🔹 Floating Message Button */}
       <div className="fixed bottom-6 right-6 z-50">
         <button
           onClick={() => setMessageOpen(true)}
@@ -84,14 +178,14 @@ const Home = () => {
         </button>
       </div>
 
-
-      {/* Popup modal for messaging friends */}
+      {/* 🔹 Message Popup Modal */}
       {messageOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
           <div className="bg-white rounded p-6 w-80 shadow-lg relative">
             <button
               onClick={() => setMessageOpen(false)}
               className="absolute top-2 right-2 text-gray-600 text-sm hover:text-black"
+              aria-label="Close message popup"
             >
               ✖
             </button>
