@@ -38,7 +38,7 @@ const Register = () => {
           bio: "",
           major: "",
           year: "",
-          avatar_url: ""
+          profile_picture: ""
         },
       ]);
 
