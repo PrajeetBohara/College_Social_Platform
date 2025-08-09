@@ -9,6 +9,7 @@ import Register from "./pages/Register";
 import Home from "./pages/Home"; // Feed & posts
 import Profile from "./pages/Profile";
 import Groups from "./pages/Groups";
+import Onboarding from "./pages/Onboarding";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -59,6 +60,10 @@ function App() {
         <Route
           path="/groups"
           element={isAuthenticated ? <Groups /> : <Navigate to="/login" />}
+        />
+        <Route
+          path="/onboarding"
+          element={isAuthenticated ? <Onboarding /> : <Navigate to="/login" />}
         />
       </Routes>
     </div>
