@@ -1,37 +1,57 @@
+// src/App.jsx
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "./firebase";
+import { supabase } from "./supabase";
 
-import Home from "./pages/Home";
+import LandingPage from "./pages/LandingPage";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
+import Home from "./pages/Home"; // Feed & posts
 import Profile from "./pages/Profile";
 import Groups from "./pages/Groups";
+import Onboarding from "./pages/Onboarding";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
-  // Persist login state using Firebase
   useEffect(() => {
-    onAuthStateChanged(auth, (user) => {
-      setIsAuthenticated(!!user);
+    const getSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      setIsAuthenticated(!!session);
+      setCheckingAuth(false);
+    };
+
+    getSession();
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsAuthenticated(!!session);
     });
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
   }, []);
+
+  if (checkingAuth) return <div className="p-6">Checking authentication...</div>;
 
   return (
     <div className="font-sans bg-gray-100 min-h-screen">
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route
+          path="/"
+          element={isAuthenticated ? <Navigate to="/home" /> : <LandingPage />}
+        />
         <Route
           path="/login"
           element={<Login setIsAuthenticated={setIsAuthenticated} />}
         />
         <Route path="/register" element={<Register />} />
         <Route
-          path="/dashboard"
-          element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />}
+          path="/home"
+          element={isAuthenticated ? <Home /> : <Navigate to="/login" />}
         />
         <Route
           path="/profile"
@@ -41,9 +61,14 @@ function App() {
           path="/groups"
           element={isAuthenticated ? <Groups /> : <Navigate to="/login" />}
         />
+        <Route
+          path="/onboarding"
+          element={isAuthenticated ? <Onboarding /> : <Navigate to="/login" />}
+        />
       </Routes>
     </div>
   );
 }
 
 export default App;
+
